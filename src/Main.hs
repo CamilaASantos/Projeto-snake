@@ -10,9 +10,9 @@ Projeto entrega 1:
     Comida; OK
     Game; OK
 [2] Criar função de movimentação: Camila
-[3] Criar leitura do teclado
-[4] Criar Menu de seleção para o usuário
-[5] Saída do estado ("Printar" estado do jogo)
+[3] Criar leitura do teclado Fernanda
+[4] Criar Menu de seleção para o usuário Fernanda
+[5] Saída do estado ("Printar" estado do jogo) Fernanda
 -}
 
 -- Direções: Movimentação da cobra
