@@ -45,8 +45,10 @@ checaEx cobra@(Snake ((x,y):xs) _ _ estado _ ) =
   |otherwise = cobra
 
 -- Checa se a cobra  colidiu com seu corpo 
-checaColisao :: Snake -> Dir -> Snake
-checaColisao cobra@(Snake ((x,y):xs) _ _ estado _ ) d = undefined
+checaColisao :: Snake  -> Snake
+checaColisao cobra@(Snake (x:xs) _ _ estado _ ) d = 
+  | x `elem` xs  = cobra{state = False}
+  | otherwise = cobra
 
 -- Representação gráfica da fruta
 desenhaComida :: Food -> Picture
