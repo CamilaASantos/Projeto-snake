@@ -40,8 +40,8 @@ limiteTela = 400
 -- Checa se a cobra atingiu a extremidade do Tabuleiro
 checaEx :: Snake -> Snake
 checaEx cobra@(Snake ((x,y):xs) _ _ estado _ ) =
-  |x > limiteTela || x < -limiteTela  = cobra{state = False}
-  |y > limiteTela || y < -limiteTela  = cobra{state = False}
+  |x => limiteTela || x <= -limiteTela  = cobra{state = False}
+  |y => limiteTela || y <= -limiteTela  = cobra{state = False}
   |otherwise = cobra
 
 -- Checa se a cobra  colidiu com seu corpo 
