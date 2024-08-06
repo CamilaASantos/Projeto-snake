@@ -44,7 +44,7 @@ executable Projeto-snake-exe
   autogen-modules:
       Paths_Projeto_snake
   hs-source-dirs:
-      app
+      src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Projeto-snake
