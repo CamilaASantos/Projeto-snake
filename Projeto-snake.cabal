@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Lib
+      Main
   other-modules:
       Paths_Projeto_snake
   autogen-modules:
@@ -35,16 +36,19 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , gloss
+    , random
   default-language: Haskell2010
 
 executable Projeto-snake-exe
   main-is: Main.hs
   other-modules:
+      Lib
       Paths_Projeto_snake
   autogen-modules:
       Paths_Projeto_snake
   hs-source-dirs:
-      app
+      src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Projeto-snake
@@ -66,4 +70,6 @@ test-suite Projeto-snake-test
   build-depends:
       Projeto-snake
     , base >=4.7 && <5
+    , gloss
+    , random
   default-language: Haskell2010
