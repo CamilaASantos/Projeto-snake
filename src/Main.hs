@@ -67,13 +67,13 @@ criaComida g img = ((x, y), img)
     (x, _) = randomR (-limiteTela, limiteTela) xGen
     (y, _) = randomR (-limiteTela, limiteTela) yGen
 
--- Função que desenha o menu
+-- Função que desenha a tela inicial com a mensagem de boas-vindas
 desenhaMenu :: Picture
 desenhaMenu = pictures [
-    translate (-100) 100 $ scale 0.5 0.5 $ color white $ text "Escolha a dificuldade:",
-    translate (-100) 50 $ scale 0.3 0.3 $ color green $ text "Pressione E para Easy",
-    translate (-100) 0 $ scale 0.3 0.3 $ color yellow $ text "Pressione M para Medium",
-    translate (-100) (-50) $ scale 0.3 0.3 $ color red $ text "Pressione H para Hard"
+    translate (-200) 100 $ scale 0.5 0.5 $ color white $ text "Bem vindo ao jogo da cobrinha!",
+    translate (-200) 50 $ scale 0.3 0.3 $ color green $ text "Aperte a tecla 'P' para dar play no jogo.",
+    translate (-200) (-50) $ scale 0.3 0.3 $ color yellow $ text "Como jogar: use as teclas cima, baixo, esquerda e direita para se movimentar.",
+    translate (-200) (-100) $ scale 0.3 0.3 $ color red $ text "Objetivo: comer a maior quantidade de frutas."
   ]
 
 -- Renderiza o estado do jogo
@@ -93,9 +93,7 @@ atualizaGame _ game = game
 
 -- Reage à entrada do teclado para mudar a direção da cobra ou iniciar o jogo
 handleInput :: Event -> Game -> Game
-handleInput (EventKey (Char 'e') _ _ _) Menu = iniciarJogo 1 -- Easy
-handleInput (EventKey (Char 'm') _ _ _) Menu = iniciarJogo 3 -- Medium
-handleInput (EventKey (Char 'h') _ _ _) Menu = iniciarJogo 5 -- Hard
+handleInput (EventKey (Char 'p') _ _ _) Menu = iniciarJogo 3 -- Inicia jogo 
 handleInput (EventKey (SpecialKey KeyUp) _ _ _) (Play snake food over) = Play (snake { snakeDir = UP }) food over
 handleInput (EventKey (SpecialKey KeyDown) _ _ _) (Play snake food over) = Play (snake { snakeDir = DOWN }) food over
 handleInput (EventKey (SpecialKey KeyLeft) _ _ _) (Play snake food over) = Play (snake { snakeDir = LEFT }) food over
@@ -111,7 +109,6 @@ iniciarJogo velocidade = Play (Snake [(0,0)] RIGHT velocidade True 0) comida Fal
 
 main :: IO ()
 main = do
-
   let janela = InWindow "Tabuleiro" (2 * limiteTela, 2 * limiteTela) (500, 500)
   play janela black 10 Menu renderGame handleInput atualizaGame
   putStrLn "Fim do jogo!"  -- Imprime ao sair
