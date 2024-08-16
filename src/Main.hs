@@ -3,6 +3,7 @@ module Main where
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
 import System.Random
+import System.IO.Unsafe (unsafePerformIO)
 
 -- Direções: Movimentação da cobra
 data Dir = UP | DOWN | LEFT | RIGHT deriving (Eq, Ord, Show)
@@ -23,7 +24,7 @@ data Snake = Snake{
 }
  
 --Game: Estados do jogo
-data Game = Menu | Play Snake Food | GameOver Snake
+data Game = Menu [Picture] StdGen | Play Snake Food | GameOver Snake
 
 criaComida :: StdGen -> Picture -> Food 
 criaComida g img =
@@ -38,7 +39,7 @@ desenhaComida :: Food -> Picture
 desenhaComida ((x,y), img) =
   translate x y img
 
--- Funções selecionaAleatorio e resizeImg construídas utilizando ChatGPT como ajuda (manipulação da biblioteca Gloss)
+-- Funções selecionaAleatorio construída utilizando ChatGPT como ajuda
 -- Seleciona fruta aleatoriamente
 selecionaAleatorio :: [a] -> IO a
 selecionaAleatorio [] = error "Lista de imagens não localizada"
@@ -51,17 +52,30 @@ selecionaAleatorio ls = do
 resizeImg :: Float -> Float -> Picture -> Picture
 resizeImg sx sy img = scale sx sy img 
 
+
+-- Função que desenha o menu
+desenhaMenu :: Picture
+desenhaMenu = pictures [
+    translate (-300) 100 $ scale 0.5 0.5 $ color white $ text "Escolha a dificuldade:",
+    translate (-300) 50 $ scale 0.3 0.3 $ color green $ text "Pressione E para Easy",
+    translate (-300) 0 $ scale 0.3 0.3 $ color yellow $ text "Pressione M para Medium",
+    translate (-300) (-50) $ scale 0.3 0.3 $ color red $ text "Pressione H para Hard"
+  ]
+
 -- Função para desenhar o estado do jogo
 renderGame :: Game -> Picture
+renderGame (Menu frutas gen) = desenhaMenu
 renderGame (GameOver (Snake _ _ _ _ p)) = 
   let gameOverT = "Game Over! Pontuacao: " ++ show p
-      textSaida = translate (-400) 0 $ scale 0.4 0.4 $ color red $ text gameOverT
+      textSaida = translate (-350) 0 $ scale 0.4 0.4 $ color red $ text gameOverT
   in textSaida
 renderGame (Play (Snake xs _ _ _ _ ) fruta) = 
   pictures [desenhaCobra xs, desenhaComida fruta]
 
 handleEvent :: Event -> Game -> Game
-handleEvent _ (GameOver cobra) = GameOver cobra
+handleEvent (EventKey (Char 'e') _ _ _) (Menu frutas gen) = initGame 5 frutas gen -- Easy
+handleEvent (EventKey (Char 'm') _ _ _) (Menu frutas gen) = initGame 7 frutas gen -- Medium
+handleEvent (EventKey (Char 'h') _ _ _) (Menu frutas gen) = initGame 10 frutas gen -- Hard
 handleEvent (EventKey (SpecialKey KeyUp) _ _ _) (Play snake food) = Play (snake { snakeDir = UP }) food
 handleEvent (EventKey (SpecialKey KeyDown) _ _ _) (Play snake food) = Play (snake { snakeDir = DOWN }) food
 handleEvent (EventKey (SpecialKey KeyLeft) _ _ _) (Play snake food) = Play (snake { snakeDir = LEFT }) food
@@ -77,6 +91,13 @@ updateGame _ (Play (Snake xs dir vel s p) food) =
       snakePosCheck = checaEx (checaColisao snakeAtualizada)
   in if not (s) then GameOver snakePosCheck else Play snakePosCheck food
 updateGame _ game = game
+
+--Função para iniciar o jogo. Usamos o ChatGPT para entender como integrar o Menu com a chamada da função selecionaAleatorio. Por isso o uso do unsafePerformIO. Na segunda parte do projeto iremos tentar modificar isso.
+initGame :: Float -> [Picture] -> StdGen -> Game
+initGame vel frutas gen = Play (Snake [(0,0)] UP vel True 0) fruta
+  where
+  img = unsafePerformIO $ selecionaAleatorio frutas
+  fruta = criaComida gen img
 
 -- Funcao de movimentacao da cobra
 movimento :: Snake -> Snake
@@ -124,12 +145,7 @@ main = do
   --Gerador aleatório
   gen <- getStdGen
 
-  --Gera comida aleatória a partir das imagens importadas
-  let selecionaFruta = selecionaAleatorio frutas
-  img <- selecionaFruta
-  let food = criaComida gen img
-  let cobra = Snake [(0,0)] UP 5 True 0-- configuracoes iniciais
-  let inicialGame = Play cobra food
+  let inicialGame = Menu frutas gen
   play
     janela
     black
@@ -139,4 +155,4 @@ main = do
     handleEvent
     updateGame
   where
-    janela = InWindow "Tabuleiro" (2 * limiteTela, 2 * limiteTela) (50,50)
+    janela = InWindow "Snake Game" (2 * limiteTela, 2 * limiteTela) (50,50)
