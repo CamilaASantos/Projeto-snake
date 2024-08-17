@@ -3,7 +3,6 @@ module Main where
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
 import System.Random
-import System.IO.Unsafe (unsafePerformIO)
 
 -- Direções: Movimentação da cobra
 data Dir = UP | DOWN | LEFT | RIGHT deriving (Eq, Ord, Show)
@@ -24,16 +23,24 @@ data Snake = Snake{
 }
  
 --Game: Estados do jogo
-data Game = Menu [Picture] StdGen | Play Snake Food | GameOver Snake
+data Game = Menu [Picture] StdGen | Play Snake Food [Picture] | GameOver Snake
 
-criaComida :: StdGen -> Picture -> Food 
-criaComida g img =
-  (coord, (resizeImg 0.03 0.03 img))
-  where 
-    (xGen, yGen) = split g
-    convCoord x y = (x * 2 * limiteTela - limiteTela , y * 2 * limiteTela - limiteTela)
-    coord = convCoord (head(randoms xGen)) (head (randoms yGen))
 
+--Combina todas as posições do jogo para gerar uma lista de pos aleatórias para as frutas
+posicaoComida :: [Pos]
+posicaoComida = [(x,y) | x <- [(-limiteTela +10), (-limiteTela + 15.0) .. (limiteTela -5)], y <- [(-limiteTela +10), (-limiteTela + 15.0) .. (limiteTela - 5)]]
+
+-- ChatGPT auxiliou para trocar StdGen utilizado anteriormente na função Main para uma geração baseada na posicao da cabeça da cobra
+posicaoParaIndice :: Pos -> Int
+posicaoParaIndice (x, y) = (mod (floor x + 1000) 1000) * 1000 + (mod (floor y + 1000) 1000)
+
+criaComida :: Pos -> [Picture] -> Food 
+criaComida pos frutas = 
+   (coord, (resizeImg 0.03 0.03 fruta))
+   where 
+     coord = posicaoComida !! (posicaoParaIndice pos `mod` length posicaoComida)
+     fruta = selecionaAleatorio pos frutas
+    
 -- Representação gráfica da fruta
 desenhaComida :: Food -> Picture
 desenhaComida ((x,y), img) =
@@ -41,13 +48,9 @@ desenhaComida ((x,y), img) =
 
 -- Funções selecionaAleatorio construída utilizando ChatGPT como ajuda
 -- Seleciona fruta aleatoriamente
-selecionaAleatorio :: [a] -> IO a
-selecionaAleatorio [] = error "Lista de imagens não localizada"
-selecionaAleatorio ls = do
-  let tamanho = length ls
-  indice <-randomRIO (0, tamanho - 1)
-  return (ls !! indice)
-
+selecionaAleatorio :: Pos -> [Picture] -> Picture
+selecionaAleatorio _ [] = error "Lista de imagens não localizada"
+selecionaAleatorio pos frutas = frutas !! (posicaoParaIndice pos `mod` length frutas)
 --Ajustatamanho da imagem para ser comportada dentro da tela
 resizeImg :: Float -> Float -> Picture -> Picture
 resizeImg sx sy img = scale sx sy img 
@@ -69,42 +72,51 @@ renderGame (GameOver (Snake _ _ _ _ p)) =
   let gameOverT = "Game Over! Pontuacao: " ++ show p
       textSaida = translate (-350) 0 $ scale 0.4 0.4 $ color red $ text gameOverT
   in textSaida
-renderGame (Play (Snake xs _ _ _ _ ) fruta) = 
+renderGame (Play (Snake xs _ _ _ _ ) fruta frutas) = 
   pictures [desenhaCobra xs, desenhaComida fruta]
 
 handleEvent :: Event -> Game -> Game
-handleEvent (EventKey (Char 'e') _ _ _) (Menu frutas gen) = initGame 5 frutas gen -- Easy
-handleEvent (EventKey (Char 'm') _ _ _) (Menu frutas gen) = initGame 7 frutas gen -- Medium
-handleEvent (EventKey (Char 'h') _ _ _) (Menu frutas gen) = initGame 10 frutas gen -- Hard
-handleEvent (EventKey (SpecialKey KeyUp) _ _ _) (Play snake food) = Play (snake { snakeDir = UP }) food
-handleEvent (EventKey (SpecialKey KeyDown) _ _ _) (Play snake food) = Play (snake { snakeDir = DOWN }) food
-handleEvent (EventKey (SpecialKey KeyLeft) _ _ _) (Play snake food) = Play (snake { snakeDir = LEFT }) food
-handleEvent (EventKey (SpecialKey KeyRight) _ _ _) (Play snake food) = Play (snake { snakeDir = RIGHT }) food
+handleEvent (EventKey (Char 'e') _ _ _) (Menu frutas gen) = initGame 4 frutas gen -- Easy
+handleEvent (EventKey (Char 'm') _ _ _) (Menu frutas gen) = initGame 7 frutas gen-- Medium
+handleEvent (EventKey (Char 'h') _ _ _) (Menu frutas gen) = initGame 12 frutas gen-- Hard
+handleEvent (EventKey (SpecialKey KeyUp) _ _ _) (Play snake food frutas) = Play (snake { snakeDir = UP }) food frutas
+handleEvent (EventKey (SpecialKey KeyDown) _ _ _) (Play snake food frutas) = Play (snake { snakeDir = DOWN }) food frutas
+handleEvent (EventKey (SpecialKey KeyLeft) _ _ _) (Play snake food frutas) = Play (snake { snakeDir = LEFT }) food frutas
+handleEvent (EventKey (SpecialKey KeyRight) _ _ _) (Play snake food frutas) = Play (snake { snakeDir = RIGHT }) food frutas
 handleEvent (EventKey (SpecialKey KeyEsc) _ _ _) game = game 
 handleEvent _ game = game
 
 -- Função de atualização do estado do jogo 
 updateGame :: Float -> Game -> Game
 updateGame _ (GameOver cobra) = GameOver cobra
-updateGame _ (Play (Snake xs dir vel s p) food) = 
+updateGame _ (Play (Snake xs dir vel s p) food frutas) = 
   let snakeAtualizada = movimento (Snake xs dir vel s p)
-      snakePosCheck = checaEx (checaColisao snakeAtualizada)
-  in if not (s) then GameOver snakePosCheck else Play snakePosCheck food
+      (snakePosCheck, novaComida) = checaComida snakeAtualizada food frutas
+      snakeFinal = checaEx (checaColisao snakePosCheck)
+  in if not (s) then GameOver snakeFinal else Play snakeFinal novaComida frutas
 updateGame _ game = game
 
---Função para iniciar o jogo. Usamos o ChatGPT para entender como integrar o Menu com a chamada da função selecionaAleatorio. Por isso o uso do unsafePerformIO. Na segunda parte do projeto iremos tentar modificar isso.
+
+--Função para iniciar o jogo. Usamos o ChatGPT para entender como integrar o Menu com a chamada da função selecionaAleatorio.
 initGame :: Float -> [Picture] -> StdGen -> Game
-initGame vel frutas gen = Play (Snake [(0,0)] UP vel True 0) fruta
+initGame vel frutas g= Play (Snake [(0,0)] UP vel True 0) fruta frutas
   where
-  img = unsafePerformIO $ selecionaAleatorio frutas
-  fruta = criaComida gen img
+  fruta = criaComida coord frutas
+  (xGen, yGen) = split g
+  convCoord x y = (x * 2 * limiteTela - limiteTela , y * 2 * limiteTela - limiteTela)
+  coord = convCoord (head(randoms xGen)) (head (randoms yGen))
+
+-- Checar se a cobra apenas tem a cabeça (evitar erro por causa do init)
+safeInit :: [a] -> [a]
+safeInit [] = []
+safeInit xs = init xs
 
 -- Funcao de movimentacao da cobra
 movimento :: Snake -> Snake
-movimento (Snake ((x,y):xs) UP vel s p) = Snake ((x, y + 1 * vel):xs) UP vel s p
-movimento (Snake ((x,y):xs) DOWN vel s p) = Snake ((x, y - 1 * vel):xs) DOWN vel s p
-movimento (Snake ((x,y):xs) LEFT vel s p) = Snake ((x - 1 * vel, y):xs) LEFT vel s p
-movimento (Snake ((x,y):xs) RIGHT vel s p) = Snake ((x + 1 * vel, y):xs) RIGHT vel s p
+movimento (Snake ((x,y):xs) UP vel s p) = Snake ((x, y + 1 * vel):safeInit xs) UP vel s p
+movimento (Snake ((x,y):xs) DOWN vel s p) = Snake ((x, y - 1 * vel):safeInit xs) DOWN vel s p
+movimento (Snake ((x,y):xs) LEFT vel s p) = Snake ((x - 1 * vel, y):safeInit xs) LEFT vel s p
+movimento (Snake ((x,y):xs) RIGHT vel s p) = Snake ((x + 1 * vel, y):safeInit xs) RIGHT vel s p
 
 --Extremidades da tela 
 limiteTela :: Num a => a
@@ -117,7 +129,6 @@ checaEx cobra@(Snake ((x, y):xs) _ _ _ _)
   | y >= limiteTela - 10 || y <= -limiteTela + 10 = cobra { state = False }
   | otherwise = cobra
 
-
 -- Checa se a cobra colidiu com seu corpo
 checaColisao :: Snake -> Snake
 checaColisao cobra@(Snake (x:xs) _ _ _ _)
@@ -125,8 +136,13 @@ checaColisao cobra@(Snake (x:xs) _ _ _ _)
   | otherwise = cobra
 
 -- Checa se a cobra colidiu com comida
-checaComida :: Snake -> Food -> (Snake, Food)
-checaComida = undefined
+checaComida :: Snake -> Food -> [Picture] -> (Snake, Food)
+checaComida (Snake ((cx,cy):xs) dir vel s p) ((fx,fy), img) frutas =
+  if dist <= 15.0 
+  then (Snake ((fx, fy) : (cx, cy) : xs) dir vel s (p + 10), criaComida (cx,cy) frutas)
+  else ((Snake ((cx,cy):xs) dir vel s p), ((fx,fy), img))
+  where
+    dist = sqrt ((cx - fx)^2 + (cy - fy)^2)
 
 --Criacao da cobra (conjunto de retangulos)
 desenhaSegmentos :: Pos -> Picture
@@ -137,13 +153,13 @@ desenhaCobra cobraCorpo = pictures $ map desenhaSegmentos cobraCorpo
 
 main :: IO ()
 main = do
-
-  -- Carregar imagens de frutas (utilizado vídeo disponível em:https://www.youtube.com/watch?v=jtgcJrDQR8U como base para desenvolver a importação das imagens e toda parte de posicionamento das frutas)
+  
+  
+  -- Carregar imagens de frutas (utilizado vídeo disponível em:https://www.youtube.com/watch?v=jtgcJrDQR8U como base para desenvolver a importação das imagens e toda parte de posicionamento das frutas).
+--Para ajuste da função, usei a estrutura dada em aula de Monad ("copiando estrutura do Main")
   let frutasArq = ["_pear.bmp", "_orange.bmp", "_watermelon.bmp", "_apple.bmp"]
   frutas <- mapM loadBMP frutasArq
-
-  --Gerador aleatório
-  gen <- getStdGen
+  gen <-getStdGen
 
   let inicialGame = Menu frutas gen
   play
