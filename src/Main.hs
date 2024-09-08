@@ -11,7 +11,7 @@ data Dir = UP | DOWN | LEFT | RIGHT deriving (Eq, Ord, Show)
 type Pos = (Float, Float)
 
 --Comida: Posicao em que está representacao gráfica da comida
-type Food = (Pos, Picture)
+data Food = Food Pos Picture
 
 --Snake: Representação da cobra no jogo
 data Snake = Snake{
@@ -25,19 +25,31 @@ data Snake = Snake{
 --Game: Estados do jogo
 data Game = Menu { timer :: Float, comida :: Maybe Food } | Play Snake Food | GameOver Snake
 
-criaComida :: StdGen -> Picture -> Food 
+-- Type class para objetos que podem ser desenhados
+class Drawable a where
+    draw :: a -> Picture
+
+-- Implementação de Drawable para Food
+instance Drawable Food where
+    draw (Food (x, y) img) = translate x y img
+
+-- Implementação de Drawable para Snake
+instance Drawable Snake where
+    draw (Snake xs _ _ _ _) = desenhaCobra xs
+
+-- Implementação de Drawable para Game
+instance Drawable Game where
+    draw = renderGame
+
+-- Cria uma comida com posição aleatória
+criaComida :: StdGen -> Picture -> Food
 criaComida g img =
-  (coord, (resizeImg 0.03 0.03 img))
+  Food coord (resizeImg 0.03 0.03 img)
   where 
     (xGen, yGen) = split g
     convCoord x y = (x * 2 * limiteTela - limiteTela , y * 2 * limiteTela - limiteTela)
     coord = convCoord (head(randoms xGen)) (head (randoms yGen))
 
--- Representação gráfica da fruta
-desenhaComida :: Food -> Picture
-desenhaComida ((x,y), img) = translate x y img
-
--- Funções selecionaAleatorio e resizeImg construídas utilizando ChatGPT como ajuda (manipulação da biblioteca Gloss)
 -- Seleciona fruta aleatoriamente
 selecionaAleatorio :: [a] -> IO a
 selecionaAleatorio [] = error "Lista de imagens não localizada"
@@ -64,8 +76,8 @@ renderGame (GameOver (Snake _ _ _ _ p)) =
   let gameOverT = "Game Over! Pontuacao: " ++ show p
       textSaida = translate (-400) 0 $ scale 0.4 0.4 $ color red $ text gameOverT
   in textSaida
-renderGame (Play (Snake xs _ _ _ _ ) fruta) = 
-  pictures [desenhaCobra xs, desenhaComida fruta]
+renderGame (Play snake food) = 
+  pictures [draw snake, draw food]
 
 handleEvent :: Event -> Game -> Game
 handleEvent (EventKey (Char 'p') Down _ _) (Menu _ (Just comida)) = 
@@ -80,26 +92,25 @@ handleEvent _ game = game
 
 -- Função de atualização do estado do jogo 
 updateGame :: Float -> Game -> Game
-updateGame dt (Menu t comida) 
-  | t - dt <= 0 = 
-      let gen = mkStdGen 42
-          img = color red $ circleSolid 10 -- Exemplo de comida gerada
-          comida = criaComida gen img
-      in Play (Snake [(0, 0)] UP 5 True 0) comida
-  | otherwise = Menu (t - dt) comida
+updateGame dt (Menu t comida) = Menu t comida
 updateGame _ (GameOver cobra) = GameOver cobra
-updateGame _ (Play (Snake xs dir vel s p) food) = 
-  let snakeAtualizada = movimento (Snake xs dir vel s p)
+updateGame _ (Play snake food) = 
+  let snakeAtualizada = movimento snake
       snakePosCheck = checaEx (checaColisao snakeAtualizada)
-  in if not (s) then GameOver snakePosCheck else Play snakePosCheck food
+  in if not (state snakePosCheck) 
+     then GameOver snakePosCheck 
+     else Play snakePosCheck food
 updateGame _ game = game
 
 -- Funcao de movimentacao da cobra
 movimento :: Snake -> Snake
-movimento (Snake ((x,y):xs) UP vel s p) = Snake ((x, y + 1 * vel):xs) UP vel s p
-movimento (Snake ((x,y):xs) DOWN vel s p) = Snake ((x, y - 1 * vel):xs) DOWN vel s p
-movimento (Snake ((x,y):xs) LEFT vel s p) = Snake ((x - 1 * vel, y):xs) LEFT vel s p
-movimento (Snake ((x,y):xs) RIGHT vel s p) = Snake ((x + 1 * vel, y):xs) RIGHT vel s p
+movimento (Snake ((x,y):xs) dir vel s p) = 
+  let newHead = case dir of
+        UP    -> (x, y + vel)
+        DOWN  -> (x, y - vel)
+        LEFT  -> (x - vel, y)
+        RIGHT -> (x + vel, y)
+  in Snake (newHead : init ((x,y):xs)) dir vel s p  -- Move a cobra e remove o último segmento
 
 --Extremidades da tela 
 limiteTela :: Num a => a
@@ -141,8 +152,7 @@ main = do
   gen <- getStdGen
 
   --Gera comida aleatória a partir das imagens importadas
-  let selecionaFruta = selecionaAleatorio frutas
-  img <- selecionaFruta
+  img <- selecionaAleatorio frutas
   let food = Just (criaComida gen img)
   let inicialGame = Menu 1000 food -- Inicializa o estado com comida
   play
@@ -150,7 +160,7 @@ main = do
     black
     30
     inicialGame
-    renderGame
+    draw  -- Usa a função 'draw' da type class 'Drawable'
     handleEvent
     updateGame
   where
