@@ -20,38 +20,25 @@ data Snake = Snake{
   speed :: Float, -- Velocidade de movimento
   state :: Bool, -- Armazena o estado da cobra ("viva" ou "morta")
   pontuacao :: Int --Armazena pontuacao
-} deriving (Eq, Show)
-
+}
+ 
 --Game: Estados do jogo
-data Game = Menu | Play Snake Food Bool | GameOver deriving (Eq, Show)
+data Game = Menu { timer :: Float, comida :: Maybe Food } | Play Snake Food | GameOver Snake
 
--- Funcao de movimentacao da cobra
-movimento :: Snake -> Dir -> Snake
-movimento  = undefined
-
---Extremidades da tela 
-limiteTela :: Num a => a
-limiteTela = 500
-
--- Checa se a cobra atingiu a extremidade do Tabuleiro
-checaEx :: Snake -> Snake
-checaEx cobra@(Snake ((x,y):_) _ _ estado _ ) =
-  if x > limiteTela || x < -limiteTela || y > limiteTela || y < -limiteTela
-  then cobra { state = False }
-  else cobra
-
--- Checa se a cobra colidiu com seu corpo
-checaColisao :: Snake -> Snake
-checaColisao cobra@(Snake (x:xs) _ _ estado _ ) =
-  if x `elem` xs
-  then cobra { state = False }
-  else cobra
+criaComida :: StdGen -> Picture -> Food 
+criaComida g img =
+  (coord, (resizeImg 0.03 0.03 img))
+  where 
+    (xGen, yGen) = split g
+    convCoord x y = (x * 2 * limiteTela - limiteTela , y * 2 * limiteTela - limiteTela)
+    coord = convCoord (head(randoms xGen)) (head (randoms yGen))
 
 -- Representação gráfica da fruta
 desenhaComida :: Food -> Picture
 desenhaComida ((x,y), img) = translate x y img
 
--- Função construída utilizando ChatGPT como ajuda
+-- Funções selecionaAleatorio e resizeImg construídas utilizando ChatGPT como ajuda (manipulação da biblioteca Gloss)
+-- Seleciona fruta aleatoriamente
 selecionaAleatorio :: [a] -> IO a
 selecionaAleatorio [] = error "Lista de imagens não localizada"
 selecionaAleatorio ls = do
@@ -59,62 +46,112 @@ selecionaAleatorio ls = do
   indice <- randomRIO (0, tamanho - 1)
   return (ls !! indice)
 
--- Cria uma comida em uma posição aleatória
-criaComida :: StdGen -> Picture -> Food 
-criaComida g img = ((x, y), img)
-  where
-    (xGen, yGen) = split g
-    (x, _) = randomR (-limiteTela, limiteTela) xGen
-    (y, _) = randomR (-limiteTela, limiteTela) yGen
+--Ajustatamanho da imagem para ser comportada dentro da tela
+resizeImg :: Float -> Float -> Picture -> Picture
+resizeImg sx sy img = scale sx sy img 
 
--- Função que desenha o menu
-desenhaMenu :: Picture
-desenhaMenu = pictures [
-    translate (-100) 100 $ scale 0.5 0.5 $ color white $ text "Escolha a dificuldade:",
-    translate (-100) 50 $ scale 0.3 0.3 $ color green $ text "Pressione E para Easy",
-    translate (-100) 0 $ scale 0.3 0.3 $ color yellow $ text "Pressione M para Medium",
-    translate (-100) (-50) $ scale 0.3 0.3 $ color red $ text "Pressione H para Hard"
-  ]
-
--- Renderiza o estado do jogo
+-- Função para desenhar o estado do jogo
 renderGame :: Game -> Picture
-renderGame Menu = desenhaMenu
-renderGame (Play snake food _) = pictures $ desenhaCorpo (corpo snake) ++ [desenhaComida food]
-  where
-    desenhaCorpo = map (\(x, y) -> translate x y $ color green $ rectangleSolid 20 20)
-renderGame GameOver = translate (-100) 0 $ scale 0.5 0.5 $ color red $ text "Game Over"
+renderGame (Menu _ _) = pictures [
+    translate (-350) 180 $ scale 0.5 0.5 $ color white $ text "Bem vindo ao jogo",
+    translate (-350) 100 $ scale 0.5 0.5 $ color white $ text "da cobrinha frutifera!",
+    translate (-350) 50 $ scale 0.2 0.2 $ color green $ text "Aperte a tecla 'P' para dar play no jogo.",
+    translate (-350) (-50) $ scale 0.2 0.2 $ color yellow $ text "Como jogar: use as teclas cima, baixo,",
+    translate (-350) (-100) $ scale 0.2 0.2 $ color yellow $ text "esquerda e direita para se movimentar.",
+    translate (-350) (-150) $ scale 0.2 0.2 $ color red $ text "Objetivo: comer a maior quantidade de frutas."
+  ]
+renderGame (GameOver (Snake _ _ _ _ p)) = 
+  let gameOverT = "Game Over! Pontuacao: " ++ show p
+      textSaida = translate (-400) 0 $ scale 0.4 0.4 $ color red $ text gameOverT
+  in textSaida
+renderGame (Play (Snake xs _ _ _ _ ) fruta) = 
+  pictures [desenhaCobra xs, desenhaComida fruta]
 
--- Atualiza o estado do jogo
-atualizaGame :: Float -> Game -> Game
-atualizaGame _ game@(Play snake _ _) 
-  | not (state snake) = GameOver
-  | otherwise = game
-atualizaGame _ game = game
+handleEvent :: Event -> Game -> Game
+handleEvent (EventKey (Char 'p') Down _ _) (Menu _ (Just comida)) = 
+  Play (Snake [(0, 0)] UP 5 True 0) comida
+handleEvent _ (GameOver cobra) = GameOver cobra
+handleEvent (EventKey (SpecialKey KeyUp) _ _ _) (Play snake food) = Play (snake { snakeDir = UP }) food
+handleEvent (EventKey (SpecialKey KeyDown) _ _ _) (Play snake food) = Play (snake { snakeDir = DOWN }) food
+handleEvent (EventKey (SpecialKey KeyLeft) _ _ _) (Play snake food) = Play (snake { snakeDir = LEFT }) food
+handleEvent (EventKey (SpecialKey KeyRight) _ _ _) (Play snake food) = Play (snake { snakeDir = RIGHT }) food
+handleEvent (EventKey (SpecialKey KeyEsc) _ _ _) game = game 
+handleEvent _ game = game
 
--- Reage à entrada do teclado para mudar a direção da cobra ou iniciar o jogo
-handleInput :: Event -> Game -> Game
-handleInput (EventKey (Char 'e') _ _ _) Menu = iniciarJogo 1 -- Easy
-handleInput (EventKey (Char 'm') _ _ _) Menu = iniciarJogo 3 -- Medium
-handleInput (EventKey (Char 'h') _ _ _) Menu = iniciarJogo 5 -- Hard
-handleInput (EventKey (SpecialKey KeyUp) _ _ _) (Play snake food over) = Play (snake { snakeDir = UP }) food over
-handleInput (EventKey (SpecialKey KeyDown) _ _ _) (Play snake food over) = Play (snake { snakeDir = DOWN }) food over
-handleInput (EventKey (SpecialKey KeyLeft) _ _ _) (Play snake food over) = Play (snake { snakeDir = LEFT }) food over
-handleInput (EventKey (SpecialKey KeyRight) _ _ _) (Play snake food over) = Play (snake { snakeDir = RIGHT }) food over
-handleInput (EventKey (SpecialKey KeyEsc) _ _ _) game = game -- Adiciona uma condição para sair do jogo com ESC
-handleInput _ game = game
+-- Função de atualização do estado do jogo 
+updateGame :: Float -> Game -> Game
+updateGame dt (Menu t comida) 
+  | t - dt <= 0 = 
+      let gen = mkStdGen 42
+          img = color red $ circleSolid 10 -- Exemplo de comida gerada
+          comida = criaComida gen img
+      in Play (Snake [(0, 0)] UP 5 True 0) comida
+  | otherwise = Menu (t - dt) comida
+updateGame _ (GameOver cobra) = GameOver cobra
+updateGame _ (Play (Snake xs dir vel s p) food) = 
+  let snakeAtualizada = movimento (Snake xs dir vel s p)
+      snakePosCheck = checaEx (checaColisao snakeAtualizada)
+  in if not (s) then GameOver snakePosCheck else Play snakePosCheck food
+updateGame _ game = game
 
--- Função para iniciar o jogo com uma determinada velocidade
-iniciarJogo :: Float -> Game
-iniciarJogo velocidade = Play (Snake [(0,0)] RIGHT velocidade True 0) comida False
-  where
-    comida = ((0, 0), color red $ circleSolid 10)
+-- Funcao de movimentacao da cobra
+movimento :: Snake -> Snake
+movimento (Snake ((x,y):xs) UP vel s p) = Snake ((x, y + 1 * vel):xs) UP vel s p
+movimento (Snake ((x,y):xs) DOWN vel s p) = Snake ((x, y - 1 * vel):xs) DOWN vel s p
+movimento (Snake ((x,y):xs) LEFT vel s p) = Snake ((x - 1 * vel, y):xs) LEFT vel s p
+movimento (Snake ((x,y):xs) RIGHT vel s p) = Snake ((x + 1 * vel, y):xs) RIGHT vel s p
+
+--Extremidades da tela 
+limiteTela :: Num a => a
+limiteTela = 400
+
+-- Checa se a cobra atingiu a extremidade do Tabuleiro
+checaEx :: Snake -> Snake
+checaEx cobra@(Snake ((x, y):xs) _ _ _ _) 
+  | x >= limiteTela || x <= -limiteTela + 10 = cobra { state = False }
+  | y >= limiteTela - 10 || y <= -limiteTela + 10 = cobra { state = False }
+  | otherwise = cobra
+
+
+-- Checa se a cobra colidiu com seu corpo
+checaColisao :: Snake -> Snake
+checaColisao cobra@(Snake (x:xs) _ _ _ _)
+  | x `elem` xs = cobra { state = False }
+  | otherwise = cobra
+
+-- Checa se a cobra colidiu com comida
+checaComida :: Snake -> Food -> (Snake, Food)
+checaComida = undefined
+
+--Criacao da cobra (conjunto de retangulos)
+desenhaSegmentos :: Pos -> Picture
+desenhaSegmentos (x,y) = translate x y (color green $ rectangleSolid 15.0 15.0)
+
+desenhaCobra :: [Pos] -> Picture
+desenhaCobra cobraCorpo = pictures $ map desenhaSegmentos cobraCorpo
 
 main :: IO ()
 main = do
 
-  let janela = InWindow "Tabuleiro" (2 * limiteTela, 2 * limiteTela) (500, 500)
-  play janela black 10 Menu renderGame handleInput atualizaGame
-  putStrLn "Fim do jogo!"  -- Imprime ao sair
-  -- Imprime o estado do jogo ao sair (para fins de debug ou análise)
+  -- Carregar imagens de frutas (utilizado vídeo disponível em:https://www.youtube.com/watch?v=jtgcJrDQR8U como base para desenvolver a importação das imagens e toda parte de posicionamento das frutas)
+  let frutasArq = ["_pear.bmp", "_orange.bmp", "_watermelon.bmp", "_apple.bmp"]
+  frutas <- mapM loadBMP frutasArq
+
+  --Gerador aleatório
+  gen <- getStdGen
+
+  --Gera comida aleatória a partir das imagens importadas
+  let selecionaFruta = selecionaAleatorio frutas
+  img <- selecionaFruta
+  let food = Just (criaComida gen img)
+  let inicialGame = Menu 1000 food -- Inicializa o estado com comida
+  play
+    janela
+    black
+    30
+    inicialGame
+    renderGame
+    handleEvent
+    updateGame
   where
-    imprimirEstado game = putStrLn $ "Estado do jogo: " ++ show game
+    janela = InWindow "Tabuleiro" (2 * limiteTela, 2 * limiteTela) (50,50)
