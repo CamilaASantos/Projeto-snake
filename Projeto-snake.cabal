@@ -37,6 +37,7 @@ library
   build-depends:
       base >=4.7 && <5
     , gloss
+    , mtl
     , random
   default-language: Haskell2010
 
@@ -54,6 +55,7 @@ executable Projeto-snake-exe
       Projeto-snake
     , base >=4.7 && <5
     , gloss
+    , mtl
     , random
   default-language: Haskell2010
 
@@ -71,5 +73,6 @@ test-suite Projeto-snake-test
       Projeto-snake
     , base >=4.7 && <5
     , gloss
+    , mtl
     , random
   default-language: Haskell2010
