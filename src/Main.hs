@@ -4,6 +4,7 @@ import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
 import System.Random
 import Control.Monad.State
+import Debug.Trace (trace)
 
 --Game: Estados do jogo
 data Game = Menu | Play | GameOver deriving (Eq)
@@ -32,16 +33,15 @@ data Snake = Snake{
   corpo :: [Pos],  -- Armazena todos os "segmentos" que compoem o corpo da cobra
   snakeDir :: Dir, -- Armazena direcao atual da cobra
   speed :: Float -- Velocidade de movimento
-}
+} deriving (Show)
  
  --Combina todas as posições do jogo para gerar uma lista de pos aleatórias para as frutas
 posicaoComida :: [Pos]
-posicaoComida = [(x,y) | x <- [(-limiteTela +10), (-limiteTela + 15.0) .. (limiteTela -5)], y <- [(-limiteTela +10), (-limiteTela + 15.0) .. (limiteTela - 5)]]
+posicaoComida = [(x,y) | x <- [(-limiteTela +10.0), (-limiteTela + 20.0) .. (limiteTela -10.0)], y <- [(-limiteTela +10.0), (-limiteTela + 20.0) .. (limiteTela - 10.0)]]
 
 -- ChatGPT auxiliou para trocar StdGen utilizado anteriormente na função Main para uma geração baseada na posicao da cabeça da cobra
 posicaoParaIndice :: Pos -> Int
 posicaoParaIndice (x, y) = (mod (floor x + 1000) 1000) * 1000 + (mod (floor y + 1000) 1000)
-
 
 -- Funções selecionaAleatorio construída utilizando ChatGPT como ajuda
 -- Seleciona fruta aleatoriamente
@@ -56,7 +56,7 @@ criaComida  = do
       frutas = foods gState
       pos = head $ corpo (snake gState)
       fruta = selecionaAleatorio pos frutas
-  return (coord, (resizeImg 0.03 0.03 fruta))
+  return (coord, (resizeImg 0.02 0.02 fruta))
 
 --Ajusta tamanho da imagem para ser comportada dentro da tela
 resizeImg :: Float -> Float -> Picture -> Picture
@@ -69,7 +69,7 @@ desenhaComida ((x,y), img) =
 
 --Criacao da cobra (conjunto de retangulos)
 desenhaSegmentos :: Pos -> Picture
-desenhaSegmentos (x,y) = translate x y (color green $ rectangleSolid 15.0 15.0)
+desenhaSegmentos (x,y) = translate x y (color green $ rectangleSolid 10.0 10.0)
 
 desenhaCobra :: [Pos] -> Picture
 desenhaCobra cobraCorpo = pictures $ map desenhaSegmentos cobraCorpo
@@ -110,7 +110,7 @@ handleEvent' (EventKey (Char 'e') _ _ _) = do
   estadoJogo <-gets estadoGame
   if estadoJogo == Menu || estadoJogo == GameOver
      then do
-       initGame 3 frutas-- Easy
+       initGame 0.5 frutas-- Easy
      else 
        return ()
 handleEvent' (EventKey (Char 'm') _ _ _) = do
@@ -118,7 +118,7 @@ handleEvent' (EventKey (Char 'm') _ _ _) = do
   estadoJogo <-gets estadoGame
   if estadoJogo == Menu || estadoJogo == GameOver
      then do
-       initGame 5 frutas -- Medium
+       initGame 1.0 frutas -- Medium
      else 
        return ()
 handleEvent' (EventKey (Char 'h') _ _ _) = do
@@ -126,7 +126,7 @@ handleEvent' (EventKey (Char 'h') _ _ _) = do
   estadoJogo <-gets estadoGame
   if estadoJogo == Menu || estadoJogo == GameOver
      then do
-       initGame 8 frutas -- Hard
+       initGame 2.0 frutas -- Hard
      else 
        return ()
 handleEvent' (EventKey (SpecialKey KeyUp) _ _ _)   = moveDirecao UP
@@ -145,13 +145,13 @@ updateGameState' :: Float -> State GameState ()
 updateGameState' _ = do
   moveSnake
   checaEx
-  checaColisao
+  --checaColisao
   checaComida
 
 initGame :: Float -> [Picture] -> State GameState ()
 initGame vel frutas = do
   gState <- get
-  let snakeInicial = Snake [(0,0)] UP vel
+  let snakeInicial = Snake [((20.0), (10.0)), ((10.0), (10.0)),((0.0), (10.0))] UP vel
       gen = randomGen gState
       (xGen, yGen) = split gen
       convCoord x y = (x * 2 * limiteTela - limiteTela , y * 2 * limiteTela - limiteTela)
@@ -185,11 +185,29 @@ moveSnake = do
   put gState { snake = snakeAtualizada}
 
 -- Funcao de movimentacao da cobra
+{-
 movimento :: Snake -> Snake
 movimento (Snake ((x,y):xs) UP vel) = Snake ((x, y + 1 * vel):safeInit xs) UP vel 
 movimento (Snake ((x,y):xs) DOWN vel) = Snake ((x, y - 1 * vel):safeInit xs) DOWN vel
 movimento (Snake ((x,y):xs) LEFT vel) = Snake ((x - 1 * vel, y):safeInit xs) LEFT vel
 movimento (Snake ((x,y):xs) RIGHT vel) = Snake ((x + 1 * vel, y):safeInit xs) RIGHT vel
+-}
+
+movimento :: Snake -> Snake
+movimento (Snake ((x,y):xs) dir vel) = 
+  let nHead = newHead (x,y) dir vel
+      newTailV1 = safeInit ((x,y):xs)
+      newTailV2 = safeInit $ (newHead (x,y) dir 1):newTailV1
+      newTailV3 = safeInit $ (newHead (x,y) dir 2):newTailV2
+      --newTail = if vel == 1.0 then newTailV1 else if vel ==2.0 then newTailV2 else newTailV3
+      newBody = nHead:newTailV1
+  in (Snake newBody dir vel)
+
+newHead :: Pos -> Dir -> Float -> Pos
+newHead (x,y) UP v = (x, y + v * 10)
+newHead (x,y) DOWN v = (x, y - v * 10)
+newHead (x,y) LEFT v = (x - v * 10, y)
+newHead (x,y) RIGHT v = (x + v * 10, y)
 
 --Extremidades da tela 
 limiteTela :: Num a => a
@@ -229,7 +247,7 @@ checaComida = do
     then do
       novaFruta <- criaComida
       put gState { food = novaFruta, pontuacao = pontuacao gState + 10 }
-    else return ()
+  else return ()
 
 main :: IO ()
 main = do
@@ -245,7 +263,6 @@ main = do
         estadoGame = Menu , 
         randomGen = gen
       }
-
   play
     janela
     black
