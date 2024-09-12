@@ -94,8 +94,10 @@ renderGame' = do
     Menu -> return desenhaMenu
     GameOver -> 
       let gameOverT = "Game Over! Pontuacao: " ++ show (pontuacao gState)
+          instrucao = "Pressione E, M ou H para jogar ou Esc para sair"
           textSaida = translate (-350) 0 $ scale 0.4 0.4 $ color red $ text gameOverT
-      in return textSaida
+          textInstrucao = translate (-350) (-50) $ scale 0.2 0.2 $ color green $ text instrucao
+      in  return $ pictures [textSaida, textInstrucao]
     Play -> do
       let (Snake xs _ _) = snake gState
           fruta = food gState
@@ -185,14 +187,6 @@ moveSnake = do
   put gState { snake = snakeAtualizada}
 
 -- Funcao de movimentacao da cobra
-{-
-movimento :: Snake -> Snake
-movimento (Snake ((x,y):xs) UP vel) = Snake ((x, y + 1 * vel):safeInit xs) UP vel 
-movimento (Snake ((x,y):xs) DOWN vel) = Snake ((x, y - 1 * vel):safeInit xs) DOWN vel
-movimento (Snake ((x,y):xs) LEFT vel) = Snake ((x - 1 * vel, y):safeInit xs) LEFT vel
-movimento (Snake ((x,y):xs) RIGHT vel) = Snake ((x + 1 * vel, y):safeInit xs) RIGHT vel
--}
-
 movimento :: Snake -> Snake
 movimento (Snake ((x,y):xs) dir vel) = 
   let nHead = newHead (x,y) dir vel
@@ -246,7 +240,7 @@ checaComida = do
   if dist <= 15.0
     then do
       novaFruta <- criaComida
-      put gState { snake = Snake ((newHead (newHead(cx,cy) dir vel) dir vel) : (cx, cy) : xs) dir vel,food = novaFruta, pontuacao = pontuacao gState + 10 }
+      put gState { snake = Snake ((newHead (newHead(cx,cy) dir (0.1)) dir vel) : (cx, cy) : xs) dir vel,food = novaFruta, pontuacao = pontuacao gState + 10 }
   else return ()
 
 main :: IO ()
