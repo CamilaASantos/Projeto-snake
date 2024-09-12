@@ -118,7 +118,7 @@ handleEvent' (EventKey (Char 'm') _ _ _) = do
   estadoJogo <-gets estadoGame
   if estadoJogo == Menu || estadoJogo == GameOver
      then do
-       initGame 1.0 frutas -- Medium
+       initGame 0.8 frutas -- Medium
      else 
        return ()
 handleEvent' (EventKey (Char 'h') _ _ _) = do
@@ -126,7 +126,7 @@ handleEvent' (EventKey (Char 'h') _ _ _) = do
   estadoJogo <-gets estadoGame
   if estadoJogo == Menu || estadoJogo == GameOver
      then do
-       initGame 2.0 frutas -- Hard
+       initGame 1.0 frutas -- Hard
      else 
        return ()
 handleEvent' (EventKey (SpecialKey KeyUp) _ _ _)   = moveDirecao UP
@@ -145,7 +145,7 @@ updateGameState' :: Float -> State GameState ()
 updateGameState' _ = do
   moveSnake
   checaEx
-  --checaColisao
+  checaColisao
   checaComida
 
 initGame :: Float -> [Picture] -> State GameState ()
@@ -156,7 +156,7 @@ initGame vel frutas = do
       (xGen, yGen) = split gen
       convCoord x y = (x * 2 * limiteTela - limiteTela , y * 2 * limiteTela - limiteTela)
       coord = convCoord (head(randoms xGen::[Float])) (head (randoms yGen::[Float]))
-  fruta <- criaComida
+      fruta = (coord, (resizeImg 0.02 0.02 (selecionaAleatorio coord frutas)))
   put gState{
     snake = snakeInicial,
     foods = frutas,
@@ -246,7 +246,7 @@ checaComida = do
   if dist <= 15.0
     then do
       novaFruta <- criaComida
-      put gState { food = novaFruta, pontuacao = pontuacao gState + 10 }
+      put gState { snake = Snake ((newHead (newHead(cx,cy) dir vel) dir vel) : (cx, cy) : xs) dir vel,food = novaFruta, pontuacao = pontuacao gState + 10 }
   else return ()
 
 main :: IO ()
