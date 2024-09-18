@@ -4,7 +4,6 @@ import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
 import System.Random
 import Control.Monad.State
-import Debug.Trace (trace)
 
 --Game: Estados do jogo
 data Game = Menu | Play | GameOver deriving (Eq)
@@ -167,7 +166,7 @@ initGame vel frutas = do
     estadoGame = Play
   }
 
--- Checar se a cobra apenas tem a cabeça (evitar erro por causa do init)
+-- Funcao utilizada na movimentacao
 safeInit :: [a] -> [a]
 safeInit [] = []
 safeInit xs = init xs
