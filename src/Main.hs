@@ -6,7 +6,7 @@ import System.Random
 import Control.Monad.State
 
 {---------------------------------ADTs do jogo----------------------------- -}
---Game: Estados do jogo
+-- Game: Estados do jogo
 data Game = Menu | Play | GameOver deriving (Eq)
 
 --Estrutura de todos os elementos do jogo - Refatoração usando Monada State
@@ -19,13 +19,13 @@ data GameState = GameState {
   randomGen :: StdGen  -- Gerador de números aleatórios
 } 
 
--- Direções: Movimentação da cobra
+-- Direções: Movimentações possíveis para a cobra
 data Dir = UP | DOWN | LEFT | RIGHT deriving (Eq, Ord, Show)
 
--- Posicao: Utilizado para gerar a posição dos segmentos do corpo da cobra e comida (baseado em https://haskell.pesquisa.ufabc.edu.br/haskell/07.adt/ 2.1 - Tipo Soma)
+-- Posição: Utilizado para gerar a posição dos segmentos do corpo da cobra e comida (baseado em https://haskell.pesquisa.ufabc.edu.br/haskell/07.adt/ 2.1 - Tipo Soma)
 type Pos = (Float, Float)
 
---Comida: Posicao em que está representacao gráfica da comida
+--Comida: Posicao em que está representação gráfica da comida
 type Food = (Pos, Picture)
 
 --Snake: Representação da cobra no jogo
@@ -50,6 +50,7 @@ selecionaAleatorio :: Pos -> [Picture] -> Picture
 selecionaAleatorio _ [] = error "Lista de imagens não localizada"
 selecionaAleatorio pos frutas = frutas !! (posicaoParaIndice pos `mod` length frutas)
 
+-- Função para criação da comida
 criaComida :: State GameState Food 
 criaComida  = do
   gState <- get
@@ -70,19 +71,20 @@ desenhaComida ((x,y), img) =
 
 {---------------------------------Manipulação da cobra ----------------------------- -}
 
---Criacao da cobra (conjunto de retangulos)
+-- Criação de cada segmento da cobra
 desenhaSegmentos :: Pos -> Picture
 desenhaSegmentos (x,y) = translate x y (color green $ rectangleSolid 10.0 10.0)
 
+--Criacao da cobra (conjunto de segmentos)
 desenhaCobra :: [Pos] -> Picture
 desenhaCobra cobraCorpo = pictures $ map desenhaSegmentos cobraCorpo
 
-
--- Funcao utilizada na movimentacao
+-- FUnção Init ajustada para casos em que a lista é vazia
 safeInit :: [a] -> [a]
 safeInit [] = []
 safeInit xs = init xs
 
+--Atualiza a direção da movimentação da cobra
 moveDirecao :: Dir -> State GameState ()
 moveDirecao dir = do
   gState <- get  
@@ -108,6 +110,7 @@ movimento (Snake ((x,y):xs) dir vel) =
       newBody = nHead:newTailV1
   in (Snake newBody dir vel)
 
+--Função que cria nova cabeça da cobra durante movimentação
 newHead :: Pos -> Dir -> Float -> Pos
 newHead (x,y) UP v = (x, y + v * 10)
 newHead (x,y) DOWN v = (x, y - v * 10)
@@ -141,7 +144,6 @@ checaColisao = do
     else return ()
 
 -- Checa se a cobra colidiu com comida
-
 checaComida :: State GameState ()
 checaComida = do
   gState <- get
@@ -169,6 +171,7 @@ desenhaMenu = pictures [
     translate (-350) (-250) $ scale 0.2 0.2 $ color red $ text "Objetivo: comer a maior quantidade de frutas."
   ]
 
+-- FUnção que seta as configurações iniciais do jogo
 initGame :: Float -> [Picture] -> State GameState ()
 initGame vel frutas = do
   gState <- get
@@ -187,10 +190,11 @@ initGame vel frutas = do
   }
 
 {---------------------------------Funções de atualização ----------------------------- -}
+
 renderGame :: GameState -> Picture
 renderGame gState = evalState renderGame' gState
 
--- Função para desenhar o estado do jogo
+-- Função para desenhar o estado do jogo (renderiza os objetos que fazem parte do jogo)
 renderGame' :: State GameState Picture
 renderGame' = do
   gState <- get
@@ -209,6 +213,7 @@ renderGame' = do
           fruta = food gState
       return $ pictures [desenhaCobra xs, desenhaComida fruta]
 
+-- Função que varia estado do jogo de acordo com teclas apertadas
 handleEvent :: Event -> GameState -> GameState
 handleEvent event gState = execState (handleEvent' event) gState
 
@@ -255,7 +260,6 @@ updateGameState' _ = do
   checaEx
   checaColisao
   checaComida
-
 
 main :: IO ()
 main = do
