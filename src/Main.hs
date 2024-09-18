@@ -5,10 +5,11 @@ import Graphics.Gloss.Interface.Pure.Game
 import System.Random
 import Control.Monad.State
 
+{---------------------------------ADTs do jogo----------------------------- -}
 --Game: Estados do jogo
 data Game = Menu | Play | GameOver deriving (Eq)
 
---Construção de todos os elementos do jogo - Refatoração usando Monada de estado
+--Estrutura de todos os elementos do jogo - Refatoração usando Monada State
 data GameState = GameState {
   snake :: Snake, -- Armazena cobra 
   foods :: [Picture], -- Lista de imagens para frutas
@@ -34,6 +35,8 @@ data Snake = Snake{
   speed :: Float -- Velocidade de movimento
 } deriving (Show)
  
+{---------------------------------Manipulação da comida----------------------------- -}
+
  --Combina todas as posições do jogo para gerar uma lista de pos aleatórias para as frutas
 posicaoComida :: [Pos]
 posicaoComida = [(x,y) | x <- [(-limiteTela +10.0), (-limiteTela + 20.0) .. (limiteTela -10.0)], y <- [(-limiteTela +10.0), (-limiteTela + 20.0) .. (limiteTela - 10.0)]]
@@ -42,8 +45,7 @@ posicaoComida = [(x,y) | x <- [(-limiteTela +10.0), (-limiteTela + 20.0) .. (lim
 posicaoParaIndice :: Pos -> Int
 posicaoParaIndice (x, y) = (mod (floor x + 1000) 1000) * 1000 + (mod (floor y + 1000) 1000)
 
--- Funções selecionaAleatorio construída utilizando ChatGPT como ajuda
--- Seleciona fruta aleatoriamente
+-- Funções selecionaAleatorio serve para selecionar fruta aleatóriaente. Construída utilizando ChatGPT como ajuda
 selecionaAleatorio :: Pos -> [Picture] -> Picture
 selecionaAleatorio _ [] = error "Lista de imagens não localizada"
 selecionaAleatorio pos frutas = frutas !! (posicaoParaIndice pos `mod` length frutas)
@@ -66,6 +68,8 @@ desenhaComida :: Food -> Picture
 desenhaComida ((x,y), img) =
   translate x y img
 
+{---------------------------------Manipulação da cobra ----------------------------- -}
+
 --Criacao da cobra (conjunto de retangulos)
 desenhaSegmentos :: Pos -> Picture
 desenhaSegmentos (x,y) = translate x y (color green $ rectangleSolid 10.0 10.0)
@@ -73,98 +77,6 @@ desenhaSegmentos (x,y) = translate x y (color green $ rectangleSolid 10.0 10.0)
 desenhaCobra :: [Pos] -> Picture
 desenhaCobra cobraCorpo = pictures $ map desenhaSegmentos cobraCorpo
 
--- Função que desenha o menu
-desenhaMenu :: Picture
-desenhaMenu = pictures [
-    translate (-300) 100 $ scale 0.5 0.5 $ color white $ text "Escolha a dificuldade:",
-    translate (-300) 50 $ scale 0.3 0.3 $ color green $ text "Pressione E para Easy",
-    translate (-300) 0 $ scale 0.3 0.3 $ color yellow $ text "Pressione M para Medium",
-    translate (-300) (-50) $ scale 0.3 0.3 $ color red $ text "Pressione H para Hard"
-  ]
-
-renderGame :: GameState -> Picture
-renderGame gState = evalState renderGame' gState
-
--- Função para desenhar o estado do jogo
-renderGame' :: State GameState Picture
-renderGame' = do
-  gState <- get
-  case estadoGame gState of
-    Menu -> return desenhaMenu
-    GameOver -> 
-      let gameOverT = "Game Over! Pontuacao: " ++ show (pontuacao gState)
-          instrucao = "Pressione E, M ou H para jogar ou Esc para sair"
-          textSaida = translate (-350) 0 $ scale 0.4 0.4 $ color red $ text gameOverT
-          textInstrucao = translate (-350) (-50) $ scale 0.2 0.2 $ color green $ text instrucao
-      in  return $ pictures [textSaida, textInstrucao]
-    Play -> do
-      let (Snake xs _ _) = snake gState
-          fruta = food gState
-      return $ pictures [desenhaCobra xs, desenhaComida fruta]
-
-handleEvent :: Event -> GameState -> GameState
-handleEvent event gState = execState (handleEvent' event) gState
-
-handleEvent' :: Event -> State GameState ()
-handleEvent' (EventKey (Char 'e') _ _ _) = do
-  frutas <- gets foods
-  estadoJogo <-gets estadoGame
-  if estadoJogo == Menu || estadoJogo == GameOver
-     then do
-       initGame 0.5 frutas-- Easy
-     else 
-       return ()
-handleEvent' (EventKey (Char 'm') _ _ _) = do
-  frutas <- gets foods
-  estadoJogo <-gets estadoGame
-  if estadoJogo == Menu || estadoJogo == GameOver
-     then do
-       initGame 0.8 frutas -- Medium
-     else 
-       return ()
-handleEvent' (EventKey (Char 'h') _ _ _) = do
-  frutas <- gets foods
-  estadoJogo <-gets estadoGame
-  if estadoJogo == Menu || estadoJogo == GameOver
-     then do
-       initGame 1.0 frutas -- Hard
-     else 
-       return ()
-handleEvent' (EventKey (SpecialKey KeyUp) _ _ _)   = moveDirecao UP
-handleEvent' (EventKey (SpecialKey KeyDown) _ _ _) = moveDirecao DOWN
-handleEvent' (EventKey (SpecialKey KeyLeft) _ _ _) = moveDirecao LEFT
-handleEvent' (EventKey (SpecialKey KeyRight) _ _ _) = moveDirecao RIGHT
-handleEvent' (EventKey (SpecialKey KeyEsc) _ _ _) = return () 
-handleEvent' _ =  return ()
-
--- ChatGPT auxiliou com os erros recebidos da função play do gloss para atuar com as monadas, sendo necessário este ajuste nas funções principais
-updateGameState :: Float -> GameState -> GameState
-updateGameState deltaTime gState = execState (updateGameState' deltaTime) gState
-
--- Função de atualização do estado do jogo 
-updateGameState' :: Float -> State GameState ()
-updateGameState' _ = do
-  moveSnake
-  checaEx
-  checaColisao
-  checaComida
-
-initGame :: Float -> [Picture] -> State GameState ()
-initGame vel frutas = do
-  gState <- get
-  let snakeInicial = Snake [((20.0), (10.0)), ((10.0), (10.0)),((0.0), (10.0))] UP vel
-      gen = randomGen gState
-      (xGen, yGen) = split gen
-      convCoord x y = (x * 2 * limiteTela - limiteTela , y * 2 * limiteTela - limiteTela)
-      coord = convCoord (head(randoms xGen::[Float])) (head (randoms yGen::[Float]))
-      fruta = (coord, (resizeImg 0.02 0.02 (selecionaAleatorio coord frutas)))
-  put gState{
-    snake = snakeInicial,
-    foods = frutas,
-    food = fruta,
-    pontuacao = 0,
-    estadoGame = Play
-  }
 
 -- Funcao utilizada na movimentacao
 safeInit :: [a] -> [a]
@@ -241,6 +153,109 @@ checaComida = do
       novaFruta <- criaComida
       put gState { snake = Snake ((newHead (newHead(cx,cy) dir (0.1)) dir vel) : (cx, cy) : xs) dir vel,food = novaFruta, pontuacao = pontuacao gState + 10 }
   else return ()
+
+{---------------------------------Funções de inicialização ----------------------------- -}
+-- Função que desenha o menu
+desenhaMenu :: Picture
+desenhaMenu = pictures [
+    translate (-350) 280 $ scale 0.5 0.5 $ color white $ text "Bem vindo ao jogo",
+    translate (-350) 200 $ scale 0.5 0.5 $ color white $ text "da cobrinha frutifera!",
+    translate (-350) 130 $ scale 0.5 0.5 $ color white $ text "Escolha a dificuldade:",
+    translate (-300) 50 $ scale 0.3 0.3 $ color green $ text "Pressione E para Easy",
+    translate (-300) 0 $ scale 0.3 0.3 $ color yellow $ text "Pressione M para Medium",
+    translate (-300) (-50) $ scale 0.3 0.3 $ color red $ text "Pressione H para Hard",
+     translate (-350) (-150) $ scale 0.2 0.2 $ color yellow $ text "Como jogar: use as teclas cima, baixo,",
+    translate (-350) (-200) $ scale 0.2 0.2 $ color yellow $ text "esquerda e direita para se movimentar.",
+    translate (-350) (-250) $ scale 0.2 0.2 $ color red $ text "Objetivo: comer a maior quantidade de frutas."
+  ]
+
+initGame :: Float -> [Picture] -> State GameState ()
+initGame vel frutas = do
+  gState <- get
+  let snakeInicial = Snake [((20.0), (10.0)), ((10.0), (10.0)),((0.0), (10.0))] UP vel
+      gen = randomGen gState
+      (xGen, yGen) = split gen
+      convCoord x y = (x * 2 * limiteTela - limiteTela , y * 2 * limiteTela - limiteTela)
+      coord = convCoord (head(randoms xGen::[Float])) (head (randoms yGen::[Float]))
+      fruta = (coord, (resizeImg 0.02 0.02 (selecionaAleatorio coord frutas)))
+  put gState{
+    snake = snakeInicial,
+    foods = frutas,
+    food = fruta,
+    pontuacao = 0,
+    estadoGame = Play
+  }
+
+{---------------------------------Funções de atualização ----------------------------- -}
+renderGame :: GameState -> Picture
+renderGame gState = evalState renderGame' gState
+
+-- Função para desenhar o estado do jogo
+renderGame' :: State GameState Picture
+renderGame' = do
+  gState <- get
+  case estadoGame gState of
+    Menu -> return desenhaMenu
+    GameOver -> 
+      let gameOverT = "Game Over! "
+          pontua = "Pontuacao: " ++ show (pontuacao gState)
+          instrucao = "Pressione E, M ou H para jogar ou Esc para sair"
+          textSaida = translate (-250) 200 $ scale 0.6 0.6 $ color red $ text gameOverT
+          textPontuacao = translate (-250) 100 $ scale 0.5 0.5 $ color red $ text pontua
+          textInstrucao = translate (-350) (-50) $ scale 0.2 0.2 $ color green $ text instrucao
+      in  return $ pictures [textSaida, textPontuacao, textInstrucao]
+    Play -> do
+      let (Snake xs _ _) = snake gState
+          fruta = food gState
+      return $ pictures [desenhaCobra xs, desenhaComida fruta]
+
+handleEvent :: Event -> GameState -> GameState
+handleEvent event gState = execState (handleEvent' event) gState
+
+handleEvent' :: Event -> State GameState ()
+handleEvent' (EventKey (Char 'e') _ _ _) = do
+  frutas <- gets foods
+  estadoJogo <-gets estadoGame
+  if estadoJogo == Menu || estadoJogo == GameOver
+     then do
+       initGame 0.5 frutas-- Easy
+     else 
+       return ()
+handleEvent' (EventKey (Char 'm') _ _ _) = do
+  frutas <- gets foods
+  estadoJogo <-gets estadoGame
+  if estadoJogo == Menu || estadoJogo == GameOver
+     then do
+       initGame 0.8 frutas -- Medium
+     else 
+       return ()
+handleEvent' (EventKey (Char 'h') _ _ _) = do
+  frutas <- gets foods
+  estadoJogo <-gets estadoGame
+  if estadoJogo == Menu || estadoJogo == GameOver
+     then do
+       initGame 1.0 frutas -- Hard
+     else 
+       return ()
+handleEvent' (EventKey (SpecialKey KeyUp) _ _ _)   = moveDirecao UP
+handleEvent' (EventKey (SpecialKey KeyDown) _ _ _) = moveDirecao DOWN
+handleEvent' (EventKey (SpecialKey KeyLeft) _ _ _) = moveDirecao LEFT
+handleEvent' (EventKey (SpecialKey KeyRight) _ _ _) = moveDirecao RIGHT
+handleEvent' (EventKey (SpecialKey KeyEsc) _ _ _) = return () 
+handleEvent' _ =  return ()
+
+-- ChatGPT auxiliou com os erros recebidos da função play do gloss para atuar com as monadas, sendo necessário este ajuste nas funções principais
+updateGameState :: Float -> GameState -> GameState
+updateGameState deltaTime gState = execState (updateGameState' deltaTime) gState
+
+-- Função de atualização do estado do jogo 
+updateGameState' :: Float -> State GameState ()
+updateGameState' _ = do
+  moveSnake
+  checaEx
+  checaColisao
+  checaComida
+
 
 main :: IO ()
 main = do
